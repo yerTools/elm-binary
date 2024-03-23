@@ -1,0 +1,56 @@
+name: Release
+
+on:
+    push:
+        branches: ["main"]
+    schedule:
+        - cron: "0 0 * * MON"
+    workflow_dispatch:
+
+jobs:
+    build-elm: 
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main'
+        strategy:
+            matrix:
+              plattform: [linux/amd64, linux/arm/v7, linux/arm64/v8]
+        steps:
+            - name: Log in to GitHub Packages
+              uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20
+              with:
+                  username: ${{ secrets.GH_PACKAGES_USERNAME }}
+                  password: ${{ secrets.GH_PACKAGES_PASSWORD }}
+                  registry: ghcr.io
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Cache Docker layers
+              uses: actions/cache@v4
+              with:
+                  path: /tmp/.buildx-cache
+                  key: ${{ runner.os }}-${{ matrix.version }}-buildx-${{ github.sha }}
+                  restore-keys: |
+                      ${{ runner.os }}-${{ matrix.version }}-buildx-
+
+            - name: Calculate version
+              run: |
+                  YEAR=$(date +"%Y")
+                  MONTH=$(date +"%m")
+                  DAY=$(date +"%d")
+                  ARCH_TAG=$(echo ${{ matrix.version }} | sed 's|/|-|g')
+                  NEW_TAG="$ARCH_TAG-v$YEAR.$MONTH.$DAY"
+                  echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+                  echo "PACKAGE_TAG=ghcr.io/yerTools/elm-binary:$NEW_TAG" >> $GITHUB_ENV
+
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  file: ./docker/ElmBuild.Dockerfile
+                  push: true
+                  tags: ${{ env.PACKAGE_TAG }}
+                  builder: ${{ steps.buildx.outputs.name }}
+                  platforms: ${{ matrix.version }}
+                  cache-from: type=local,src=/tmp/.buildx-cache
+                  cache-to: type=local,dest=/tmp/.buildx-cache
