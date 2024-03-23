@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-elm:
+  build-elm-individual:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     strategy:
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-            fetch-depth: 0
+          fetch-depth: 0
 
       - name: Log in to GitHub Packages
         uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20
@@ -28,14 +28,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-${{ matrix.platform }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.platform }}-buildx-
 
       - name: Calculate version
         run: |
@@ -56,5 +48,51 @@ jobs:
           tags: ${{ env.PACKAGE_TAG }}
           builder: ${{ steps.buildx.outputs.name }}
           platforms: ${{ matrix.platform }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+
+  build-elm-multi-platform:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: build-elm-individual
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Log in to GitHub Packages
+        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20
+        with:
+          username: ${{ secrets.GH_PACKAGES_USERNAME }}
+          password: ${{ secrets.GH_PACKAGES_PASSWORD }}
+          registry: ghcr.io
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Calculate version
+        run: |
+          YEAR=$(date +"%Y")
+          MONTH=$(date +"%m")
+          DAY=$(date +"%d")
+          NEW_TAG="v$YEAR.$MONTH.$DAY"
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "LATEST_TAG=ghcr.io/yertools/elm-binary:latest" >> $GITHUB_ENV
+          echo "PACKAGE_TAG=ghcr.io/yertools/elm-binary:$NEW_TAG" >> $GITHUB_ENV
+
+      - name: Copy binaries
+        run: |
+          docker create --name temp-amd64 ghcr.io/yertools/elm-binary:linux-amd64-$NEW_TAG
+          docker cp temp-amd64:/elm ./elm-amd64
+          docker rm temp-amd64
+          docker create --name temp-arm64 ghcr.io/yertools/elm-binary:linux-arm64-v8-v$NEW_TAG
+          docker cp temp-arm64:/elm ./elm-arm64
+          docker rm temp-arm64
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/elm-build-multi-platform.dockerfile
+          push: true
+          tags: ${{ env.PACKAGE_TAG }},${{ env.LATEST_TAG }}
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64,linux/arm64/v8
