@@ -47,10 +47,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/ElmBuild.Dockerfile
+          file: ./docker/elm-build.dockerfile
           push: true
           tags: ${{ env.PACKAGE_TAG }}
           builder: ${{ steps.buildx.outputs.name }}
-          platforms: ${{ matrix.plattform }}
+          platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
