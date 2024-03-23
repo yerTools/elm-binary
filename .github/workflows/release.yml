@@ -13,12 +13,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm/v7, linux/arm64/v8]
+        platform: [linux/amd64, linux/arm64/v8]
     steps:
       - uses: actions/checkout@v4
         with:
             fetch-depth: 0
-            
+
       - name: Log in to GitHub Packages
         uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20
         with:
