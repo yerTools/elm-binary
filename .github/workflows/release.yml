@@ -40,7 +40,7 @@ jobs:
           echo "PACKAGE_TAG=ghcr.io/yertools/elm-binary:$NEW_TAG" >> $GITHUB_ENV
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/elm-build.dockerfile
@@ -88,7 +88,7 @@ jobs:
           docker rm temp-arm64
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/elm-build-multi-platform.dockerfile
